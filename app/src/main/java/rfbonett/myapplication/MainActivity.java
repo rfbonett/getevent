@@ -37,6 +37,7 @@ public class MainActivity extends AppCompatActivity {
     private Button scrButton;
     private InputStream is;
     private ExecutorService service;
+    private ArrayList<String> results;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,6 +50,7 @@ public class MainActivity extends AppCompatActivity {
         //s.setOnSeekBarChangeListener(new SlideBarListener());
 
         //sm = new ScreenshotManager();
+        results = new ArrayList<>();
         t = (TextView) findViewById(R.id.display);
         OutputStream outputStream;
         try {
@@ -83,17 +85,28 @@ public class MainActivity extends AppCompatActivity {
             Log.v("GetEventTask", "Starting!");
             try {
                 while(is.read(res) > 0) {
-                    Log.v("GetEventTask", format(res));
+                    String result = format(res);
+                    results.add(result);
+                    Log.v("GetEventTask", result);
                 }
             } catch (Exception e) {Log.v("GetEventTask", "Whoops! " + e.getMessage());}
             Log.v("GetEventTask", "Done!");
         }
 
         private String format(byte[] val) {
-            ByteBuffer buf = ByteBuffer.wrap(val);
-            String time = String.valueOf(buf.getInt(0)) + "." + String.valueOf(buf.getInt(1));
-            //String type = String.valueOf(buf.getShort())
-            return time;
+            //ByteBuffer was having issues unpacking these. Used manual conversions instead
+            //getevent: [seconds.microseconds] device: type code value
+            int seconds = toInt(res[0]) + (toInt(res[1]) << 8) + (toInt(res[2]) << 16) + (toInt(res[3]) << 24);
+            int microseconds = toInt(res[4]) + (toInt(res[5]) << 8) + (toInt(res[6]) << 16) + (toInt(res[7]) << 24);
+            short type = (short) (toInt(res[8]) + (toInt(res[9]) << 8));
+            short code = (short) (toInt(res[10]) + (toInt(res[11]) << 8));
+            int value = toInt(res[12]) + (toInt(res[13]) << 8) + (toInt(res[14]) << 16) + (toInt(res[15]) << 24);
+
+            return String.format("[%d.%d] /dev/input/event5: %04x %04x %08x", seconds, microseconds, type, code, value);
+        }
+
+        private int toInt(byte b) {
+            return b & 0x000000FF;
         }
     }
 
@@ -103,6 +116,7 @@ public class MainActivity extends AppCompatActivity {
 
 
     public void fireScreenshot(View v) {
+        su.destroy();
         //Screenshot scr = sm.takeScreenshot();
         //Log.v("Main", scr.getLocation());
         //t.setText(scr.getLocation());
@@ -112,26 +126,26 @@ public class MainActivity extends AppCompatActivity {
             for (int i = 0; i < 4096; i++) {
                 f.write(bit);
             }
-        } catch (Exception e) {Log.v("Main", "File not found" + e.getMessage());} */
+        } catch (Exception e) {Log.v("Main", "File not found" + e.getMessage());}
+
 
         OutputStream os = su.getOutputStream();
-        /*
         try {
             for (int i = 0; i < 4096; i++) {
                 os.write(("sendevent /dev/input/event0 0 0 0").getBytes("ASCII"));
                 os.flush();
             }
-        } catch (Exception e) {Log.v("Main", "Error: " + e.getMessage());} */
+        } catch (Exception e) {Log.v("Main", "Error: " + e.getMessage());}
         try {
-            os.write(("killall cat\n").getBytes("ASCII"));
-            os.flush();
+            //os.write(("killall cat\n").getBytes("ASCII"));
+            //os.flush();
             os.write(("exit\n").getBytes("ASCII"));
             os.flush();
             os.close();
             su.waitFor();
         } catch (Exception e) {
             Log.v("GetEventManager", "Error stopping GetEvent process: " + e.getMessage());
-        }
+        } */
     }
 
     class GetEvent implements Runnable {
